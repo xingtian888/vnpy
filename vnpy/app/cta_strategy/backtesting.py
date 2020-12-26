@@ -229,7 +229,7 @@ class BacktestingEngine:
         progress_days = int(total_days / 10)
         progress_delta = timedelta(days=progress_days)
         interval_delta = INTERVAL_DELTA_MAP[self.interval]
-
+        end_delta = timedelta(hours=23, minutes=59, seconds=59)
         start = self.start
         end = self.start + progress_delta
         progress = 0
@@ -239,21 +239,21 @@ class BacktestingEngine:
             self.output(f"加载进度：{progress_bar} [{progress:.0%}]")
 
             end = min(end, self.end)  # Make sure end time stays within set range
-
+            end2 = end + end_delta
             if self.mode == BacktestingMode.BAR:
                 data = load_bar_data(
                     self.symbol,
                     self.exchange,
                     self.interval,
                     start,
-                    end
+                    end2
                 )
             else:
                 data = load_tick_data(
                     self.symbol,
                     self.exchange,
                     start,
-                    end
+                    end2
                 )
 
             self.history_data.extend(data)
@@ -411,7 +411,7 @@ class BacktestingEngine:
             df["balance"] = df["net_pnl"].cumsum() + self.capital
 
             # When balance falls below 0, set daily return to 0
-            x = df["balance"] / df["balance"].shift(1)
+            x = df["balance"] / df["balance"].shift(1) #对数收益率
             x[x <= 0] = np.nan
             df["return"] = np.log(x).fillna(0)
 
@@ -1166,8 +1166,10 @@ class DailyResult:
         self.commission = 0
         self.slippage = 0
 
-        self.trading_pnl = 0
-        self.holding_pnl = 0
+        self.trading_pnl = 0  #交易盈亏，当产生某笔交易时，该笔交易（以收盘价计算）产生的盈亏。
+        self.holding_pnl = 0  #持仓盈亏，相对在没做任何交易的情况下。当前仓位下，价格变动（以收盘价计算）产生的盈亏。
+        # self.holding_pnl + self.trading_pnl  总盈亏
+        # 相当先把所有钱都算到最后。再去计算交易产生的那部分（盈则为正，亏为负），
         self.total_pnl = 0
         self.net_pnl = 0
 
